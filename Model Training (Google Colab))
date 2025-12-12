@@ -1,0 +1,95 @@
+#  Step 1: Install and import required libraries
+!pip install pandas nltk scikit-learn joblib
+
+import pandas as pd
+import re
+import nltk
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+import joblib
+
+nltk.download('stopwords')
+stop_words = set(stopwords.words('english'))
+
+#  Step 2: Mount Google Drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+#  Step 3: Load Old Dataset (from Kaggle_Dataset folder)
+true_df = pd.read_csv("/content/drive/MyDrive/Kaggle_Dataset/True.csv")
+fake_df = pd.read_csv("/content/drive/MyDrive/Kaggle_Dataset/Fake.csv")
+
+true_df['label'] = 1  # Real
+fake_df['label'] = 0  # Fake
+
+df_old = pd.concat([true_df, fake_df], ignore_index=True)
+df_old = df_old[['text', 'label']].dropna()
+
+#  Step 4: Load New LIAR Dataset (from LIAR_Dataset folder)
+cols = ['id', 'label', 'statement', 'subject', 'speaker', 'job_title', 'state', 'party', 'barely_true', 'half_true', 'mostly_true', 'pants_on_fire', 'context']
+
+train_df = pd.read_csv("/content/drive/MyDrive/LIAR_Dataset/train.tsv", sep="\t", names=cols)
+valid_df = pd.read_csv("/content/drive/MyDrive/LIAR_Dataset/valid.tsv", sep="\t", names=cols)
+test_df  = pd.read_csv("/content/drive/MyDrive/LIAR_Dataset/test.tsv", sep="\t", names=cols)
+
+df_liar = pd.concat([train_df, valid_df, test_df], ignore_index=True)
+
+# Binary label mapping for LIAR
+label_map = {
+    "true": 1,
+    "mostly-true": 1,
+    "half-true": 1,
+    "barely-true": 0,
+    "false": 0,
+    "pants-fire": 0
+}
+df_liar = df_liar[df_liar['label'].isin(label_map.keys())]
+df_liar['label'] = df_liar['label'].map(label_map)
+df_liar = df_liar[['statement', 'label']].rename(columns={"statement": "text"}).dropna()
+
+#  Step 5: Combine Old + New Dataset
+df_combined = pd.concat([df_old, df_liar], ignore_index=True).dropna()
+
+#  Step 6: Clean Text
+def clean_text(text):
+    text = str(text).lower()
+    text = re.sub(r'[^a-z\s]', '', text)
+    words = text.split()
+    words = [word for word in words if word not in stop_words]
+    return ' '.join(words)
+
+df_combined['cleaned_text'] = df_combined['text'].apply(clean_text)
+
+#  Step 7: TF-IDF Vectorization
+vectorizer = TfidfVectorizer(max_features=5000)
+X = vectorizer.fit_transform(df_combined['cleaned_text'])
+y = df_combined['label']
+
+#  Step 8: Train/Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+#  Step 9: Train Logistic Regression Model
+model = LogisticRegression(max_iter=1000)
+model.fit(X_train, y_train)
+
+#  Step 10: Evaluate Model
+y_pred = model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+print(f" Combined Dataset Accuracy: {accuracy:.2%}")
+
+#  Step 11: Save Model and Vectorizer
+joblib.dump(model, "new_fake_news_model.pkl")
+joblib.dump(vectorizer, "new_tfidf_vectorizer.pkl")
+print(" Model and vectorizer saved successfully!")
+
+#  Step 12: Download from Colab
+from google.colab import files
+files.download("new_fake_news_model.pkl")
+files.download("new_tfidf_vectorizer.pkl")
+
+
+
+
