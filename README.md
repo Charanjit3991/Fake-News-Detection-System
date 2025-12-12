@@ -69,14 +69,4 @@ Input (Headline, Article, or Dataset)
 → Analysis, Visualization, and CSV Export
 
 
-Repository Structure
-
-├── app.py
-├── fake_news_model.pkl
-├── new_fake_news_model.pkl
-├── tfidf_vectorizer.pkl
-├── new_tfidf_vectorizer.pkl
-├── requirements.txt
-└── README.md
-
 
